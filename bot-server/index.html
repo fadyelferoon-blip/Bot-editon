@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FER3OON Trading Bot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 1200px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #1e3c72;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #1e3c72;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+        }
+        
+        .info-box h2 {
+            color: #1e3c72;
+            margin-bottom: 10px;
+            font-size: 20px;
+        }
+        
+        .info-box p {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        
+        .status {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .endpoint-list {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .endpoint {
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        .endpoint:last-child {
+            margin-bottom: 0;
+        }
+        
+        .method {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #1e3c72;
+            color: white;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-right: 10px;
+        }
+        
+        code {
+            background: #f1f3f5;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 FER3OON Trading Bot Server</h1>
+        <p class="subtitle">MXN Trading Signals | Bot Server v1.0</p>
+        
+        <div class="status">
+            ✅ Bot Server is Running
+        </div>
+        
+        <div class="info-box">
+            <h2>📋 Server Information</h2>
+            <p><strong>Purpose:</strong> This is a static bot server that provides the trading bot interface.</p>
+            <p><strong>Trading Pair:</strong> USD/MXN (Quotex OTC)</p>
+            <p><strong>Timeframe:</strong> M1 (1 minute)</p>
+            <p><strong>Signal Type:</strong> PUT and CALL</p>
+        </div>
+        
+        <div class="info-box">
+            <h2>🔗 Integration</h2>
+            <p>This bot server works with the <strong>MXN Signals Backend</strong> which:</p>
+            <ul style="margin-left: 20px; color: #555;">
+                <li>Uses Puppeteer to scrape this bot</li>
+                <li>Extracts real trading signals</li>
+                <li>Converts timezone (UTC+6 → user timezone)</li>
+                <li>Serves signals to Flutter app via API</li>
+            </ul>
+        </div>
+        
+        <div class="endpoint-list">
+            <h2 style="margin-bottom: 15px; color: #1e3c72;">📡 Bot Information</h2>
+            
+            <div class="endpoint">
+                <span class="method">URL</span>
+                <span id="botUrl">Loading...</span>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">STATUS</span>
+                <span style="color: #28a745;">Active</span>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">TYPE</span>
+                <span>Static HTML Bot</span>
+            </div>
+        </div>
+        
+        <div class="info-box" style="margin-top: 30px;">
+            <h2>⚙️ Setup Instructions</h2>
+            <p><strong>Step 1:</strong> Deploy this bot server on Railway</p>
+            <p><strong>Step 2:</strong> Copy the bot URL (shown above)</p>
+            <p><strong>Step 3:</strong> Set <code>BOT_URL</code> in MXN Backend environment variables</p>
+            <p><strong>Step 4:</strong> Deploy MXN Backend</p>
+            <p><strong>Step 5:</strong> Test the integration!</p>
+        </div>
+        
+        <div style="margin-top: 30px; padding: 20px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;">
+            <strong>⚠️ Note:</strong> This is a <strong>static server</strong> for the bot interface. 
+            The actual signal processing happens in the <strong>MXN Backend</strong> using Puppeteer.
+        </div>
+    </div>
+    
+    <script>
+        // Display current URL
+        document.getElementById('botUrl').textContent = window.location.origin;
+    </script>
+</body>
+</html>
