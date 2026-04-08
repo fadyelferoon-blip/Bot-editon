@@ -1,13 +1,10 @@
 [phases.setup]
-nixPkgs = [
-  "nodejs_18"
-  "chromium"  # يثبت Chromium في النظام
-]
+nixPkgs = ["nodejs_18", "chromium"]
 
 [phases.install]
 cmds = [
   "npm install",
-  "export CHROMIUM_PATH=$(which chromium || which chromium-browser || which google-chrome)"
+  "export CHROMIUM_PATH=$(which chromium || which chromium-browser || which google-chrome || true)"
 ]
 
 [start]
