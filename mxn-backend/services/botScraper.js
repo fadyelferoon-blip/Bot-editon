@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer-core');
+const puppeteer = require('puppeteer');
 const fs = require('fs');
 const { execSync } = require('child_process');
 
@@ -16,32 +16,19 @@ class BotScraper {
   }
 
   findChromium() {
-    if (this.chromiumPath && fs.existsSync(this.chromiumPath)) {
-      console.log(`✅ Using Chromium from CHROMIUM_PATH: ${this.chromiumPath}`);
-      return this.chromiumPath;
-    }
-
-    const possiblePaths = [
-      '/usr/bin/chromium',
-      '/usr/bin/chromium-browser',
-      '/usr/bin/google-chrome'
-    ];
-
-    for (const p of possiblePaths) {
-      if (fs.existsSync(p)) {
-        console.log(`✅ Found Chromium at: ${p}`);
-        return p;
-      }
-    }
-
     try {
-      const path = execSync('which chromium || which chromium-browser || which google-chrome', { encoding: 'utf8' }).trim();
-      if (path) {
-        console.log(`✅ Found Chromium via which: ${path}`);
-        return path;
+      if (this.chromiumPath && fs.existsSync(this.chromiumPath)) {
+        console.log(`✅ Using Chromium from CHROMIUM_PATH: ${this.chromiumPath}`);
+        return this.chromiumPath;
       }
-    } catch (_) {}
 
+      const possiblePaths = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'];
+      for (const p of possiblePaths) if (fs.existsSync(p)) return p;
+
+      const path = execSync('which chromium || which chromium-browser || which google-chrome', { encoding: 'utf8' }).trim();
+      if (path) return path;
+
+    } catch (_) {}
     console.error('❌ Chromium not found. Scraping will fail.');
     return null;
   }
@@ -51,20 +38,12 @@ class BotScraper {
     const executablePath = this.findChromium();
     if (!executablePath) throw new Error('Chromium not found');
 
-    console.log('🚀 Launching browser...');
     this.browser = await puppeteer.launch({
       executablePath,
       headless: 'new',
-      protocolTimeout: 180000,
       args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-extensions'
+        '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
+        '--disable-gpu', '--no-first-run', '--no-zygote', '--single-process', '--disable-extensions'
       ]
     });
     console.log('✅ Browser launched');
@@ -73,7 +52,6 @@ class BotScraper {
   async scrapeSignals(orderType = 'PUT', pair = 'USD_MXN_OTC_QTX') {
     try {
       await this.initBrowser();
-      console.log(`📡 Scraping ${orderType} for ${pair}...`);
       const page = await this.browser.newPage();
       await page.setViewport({ width: 1280, height: 800 });
       await page.goto(this.botUrl, { waitUntil: 'networkidle2', timeout: 60000 });
@@ -85,30 +63,16 @@ class BotScraper {
       await page.select('#selDays', '20');
       await page.select('#selOrderType', orderType);
 
-      console.log(`✅ Form filled: ${pair}, ${orderType}`);
-      await page.evaluate(() => { getHistoric(); });
+      await page.evaluate(() => getHistoric());
 
-      await page.waitForFunction(
-        () => typeof listBestPairTimes !== 'undefined' && listBestPairTimes.length > 0,
-        { timeout: 90000 }
-      );
+      await page.waitForFunction(() => typeof listBestPairTimes !== 'undefined' && listBestPairTimes.length > 0, { timeout: 90000 });
 
-      const signals = await page.evaluate((type, pairName) => {
-        return listBestPairTimes.map(s => {
+      const signals = await page.evaluate((type, pairName) =>
+        listBestPairTimes.map(s => {
           const t = s.time.split(':');
-          return {
-            pair: pairName,
-            hour: parseInt(t[0]),
-            minute: parseInt(t[1]),
-            second: parseInt(t[2] || 0),
-            time: s.time,
-            type,
-            winrate: s.winrate || 100
-          };
-        });
-      }, orderType, pair);
+          return { pair: pairName, hour: parseInt(t[0]), minute: parseInt(t[1]), second: parseInt(t[2] || 0), time: s.time, type, winrate: s.winrate || 100 };
+        }), orderType, pair);
 
-      console.log(`✅ Got ${signals.length} ${orderType} signals for ${pair}`);
       await page.close();
       return signals;
 
@@ -125,9 +89,7 @@ class BotScraper {
         const signals = await this.scrapeSignals(orderType, pair);
         all.push(...signals);
         await this.sleep(1000);
-      } catch (e) {
-        console.error(`⚠️ Skipping ${pair} ${orderType}: ${e.message}`);
-      }
+      } catch (e) { console.error(`⚠️ Skipping ${pair} ${orderType}: ${e.message}`); }
     }
     await this.closeBrowser();
     return all;
