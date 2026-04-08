@@ -24,7 +24,8 @@ class BotScraper {
     if (this.browser) return;
     console.log('🚀 Launching browser...');
     this.browser = await puppeteer.launch({
-      headless: 'new',
+      headless: "new",
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       protocolTimeout: 180000,
       args: [
         '--no-sandbox',
