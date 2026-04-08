@@ -1,9 +1,9 @@
 [phases.setup]
-nixPkgs = ["nodejs_18", "chromium"]
+nixPkgs = ["nodejs_18" "chromium"]
 
 [phases.install]
 cmds = [
-  "npm install",
+  "npm install --omit=dev",
   "export CHROMIUM_PATH=$(which chromium || which chromium-browser || which google-chrome || true)"
 ]
 
