@@ -1,18 +1,19 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 
-// All supported pairs
 const ALL_PAIRS = [
-  'USD_MXN_OTC_QTX',
-  'USD_TRY_OTC_QTX',
-  'US_CRUDE_OTC_QTX',
-  'UK_BRENT_OTC_QTX',
-  'GOLD_OTC_QTX',
-  'SILVER_OTC_QTX',
-  'USD_INR_OTC_QTX',
-  'BITCOIN_OTC_QTX',
-  'LTC_USD_OTC_QTX',
-  'ETH_USD_OTC_QTX'
+  'USD_MXN_OTC_QTX', 'USD_TRY_OTC_QTX', 'US_CRUDE_OTC_QTX',
+  'UK_BRENT_OTC_QTX', 'GOLD_OTC_QTX', 'SILVER_OTC_QTX',
+  'USD_INR_OTC_QTX', 'BITCOIN_OTC_QTX', 'LTC_USD_OTC_QTX', 'ETH_USD_OTC_QTX'
 ];
+
+// Chromium paths to try
+const CHROMIUM_PATHS = [
+  '/run/current-system/sw/bin/chromium',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/usr/bin/google-chrome',
+  process.env.CHROMIUM_PATH,
+].filter(Boolean);
 
 class BotScraper {
   constructor() {
@@ -20,115 +21,109 @@ class BotScraper {
     this.botUrl = process.env.BOT_URL || 'https://fer3oon-bot.railway.app';
   }
 
+  async findChromium() {
+    const fs = require('fs');
+    for (const p of CHROMIUM_PATHS) {
+      if (fs.existsSync(p)) {
+        console.log(`✅ Found Chromium at: ${p}`);
+        return p;
+      }
+    }
+    // Try which command
+    try {
+      const { execSync } = require('child_process');
+      const path = execSync('which chromium || which chromium-browser || which google-chrome', { encoding: 'utf8' }).trim();
+      if (path) { console.log(`✅ Found Chromium via which: ${path}`); return path; }
+    } catch (_) {}
+    throw new Error('Chromium not found. Set CHROMIUM_PATH env variable.');
+  }
+
   async initBrowser() {
     if (this.browser) return;
     console.log('🚀 Launching browser...');
+    const executablePath = await this.findChromium();
     this.browser = await puppeteer.launch({
-      headless: "new",
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      executablePath,
+      headless: 'new',
       protocolTimeout: 180000,
       args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-extensions'
+        '--no-sandbox', '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage', '--disable-gpu',
+        '--no-first-run', '--no-zygote',
+        '--single-process', '--disable-extensions'
       ]
     });
-    console.log('✅ Browser launched successfully');
+    console.log('✅ Browser launched');
   }
 
   async scrapeSignals(orderType = 'PUT', pair = 'USD_MXN_OTC_QTX') {
     try {
       await this.initBrowser();
-      console.log(`📡 Scraping ${orderType} signals for ${pair}...`);
-
+      console.log(`📡 Scraping ${orderType} for ${pair}...`);
       const page = await this.browser.newPage();
       await page.setViewport({ width: 1280, height: 800 });
-
-      console.log(`🌐 Navigating to ${this.botUrl}...`);
       await page.goto(this.botUrl, { waitUntil: 'networkidle2', timeout: 60000 });
 
-      await page.select('#cbAtivo', pair);
-      await page.waitForTimeout(500);
-      await page.select('#selPercentageMin', '100');
-      await page.waitForTimeout(500);
-      await page.select('#selPercentageMax', '100');
-      await page.waitForTimeout(500);
-      await page.select('#selCandleTime', 'M1');
-      await page.waitForTimeout(500);
-      await page.select('#selDays', '20');
-      await page.waitForTimeout(500);
-      await page.select('#selOrderType', orderType);
-      await page.waitForTimeout(500);
+      await page.select('#cbAtivo', pair);          await page.waitForTimeout(500);
+      await page.select('#selPercentageMin', '100'); await page.waitForTimeout(500);
+      await page.select('#selPercentageMax', '100'); await page.waitForTimeout(500);
+      await page.select('#selCandleTime', 'M1');     await page.waitForTimeout(500);
+      await page.select('#selDays', '20');            await page.waitForTimeout(500);
+      await page.select('#selOrderType', orderType); await page.waitForTimeout(500);
 
-      console.log(`✅ Form filled: ${pair}, 100%, M1, 20 days, ${orderType}`);
-
+      console.log(`✅ Form filled: ${pair}, ${orderType}`);
       await page.evaluate(() => { getHistoric(); });
 
-      console.log('⏳ Waiting for analysis...');
       await page.waitForFunction(
         () => typeof listBestPairTimes !== 'undefined' && listBestPairTimes.length > 0,
         { timeout: 90000 }
       );
 
       const signals = await page.evaluate((type, pairName) => {
-        return listBestPairTimes.map(signal => {
-          const timeParts = signal.time.split(':');
+        return listBestPairTimes.map(s => {
+          const t = s.time.split(':');
           return {
-            pair: pairName,
-            hour: parseInt(timeParts[0]),
-            minute: parseInt(timeParts[1]),
-            second: parseInt(timeParts[2] || 0),
-            time: signal.time,
-            type: type,
-            winrate: signal.winrate || 100
+            pair: pairName, hour: parseInt(t[0]),
+            minute: parseInt(t[1]), second: parseInt(t[2] || 0),
+            time: s.time, type, winrate: s.winrate || 100
           };
         });
       }, orderType, pair);
 
-      console.log(`✅ Extracted ${signals.length} ${orderType} signals for ${pair}`);
+      console.log(`✅ Got ${signals.length} ${orderType} signals for ${pair}`);
       await page.close();
       await this.closeBrowser();
       return signals;
 
     } catch (error) {
-      console.error(`❌ Error scraping ${pair} ${orderType}:`, error);
+      console.error(`❌ Error scraping ${pair} ${orderType}:`, error.message);
       await this.closeBrowser();
       throw error;
     }
   }
 
-  // Scrape all pairs for one order type
   async scrapeAllPairs(orderType = 'PUT') {
-    const allSignals = [];
+    const all = [];
     for (const pair of ALL_PAIRS) {
       try {
-        console.log(`🔄 Scraping ${pair} ${orderType}...`);
         const signals = await this.scrapeSignals(orderType, pair);
-        allSignals.push(...signals);
+        all.push(...signals);
         await this.sleep(1000);
       } catch (e) {
-        console.error(`⚠️ Failed ${pair} ${orderType}, skipping...`);
+        console.error(`⚠️ Skipping ${pair} ${orderType}: ${e.message}`);
       }
     }
-    return allSignals;
+    return all;
   }
 
   async closeBrowser() {
     if (this.browser) {
-      await this.browser.close();
+      await this.browser.close().catch(() => {});
       this.browser = null;
-      console.log('✅ Browser closed');
     }
   }
 
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+  sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 }
 
 module.exports = new BotScraper();
