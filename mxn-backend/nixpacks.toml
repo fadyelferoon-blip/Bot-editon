@@ -1,8 +1,0 @@
-[phases.setup]
-nixPkgs = ["nodejs_18", "chromium", "nss", "atk", "at-spi2-atk", "cups", "libdrm", "gtk3", "libxkbcommon", "libxcomposite", "libxdamage", "libxrandr", "libgbm", "libasound"]
-
-[phases.install]
-cmds = ["npm install"]
-
-[start]
-cmd = "node server.js"
