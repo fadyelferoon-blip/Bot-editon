@@ -41,7 +41,7 @@ class BotScraper {
   async initBrowser() {
     if (this.browser) return;
     console.log('🚀 Launching browser...');
-    const executablePath = await this.findChromium();
+    const executablePath = process.env.CHROMIUM_PATH || await this.findChromium();
     this.browser = await puppeteer.launch({
       executablePath,
       headless: 'new',
