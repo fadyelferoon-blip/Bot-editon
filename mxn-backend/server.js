@@ -1,13 +1,67 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const { execSync } = require('child_process');
 
 const signalsRoutes = require('./routes/signals');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// CORS Configuration
+// ── Find Chromium at startup ──────────────────────────────────────────────────
+function findChromiumPath() {
+  const candidates = [
+    process.env.CHROMIUM_PATH,
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome',
+    '/run/current-system/sw/bin/chromium',
+  ].filter(Boolean);
+
+  const fs = require('fs');
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+
+  // Try shell search
+  const cmds = ['which chromium', 'which chromium-browser', 'which google-chrome'];
+  for (const cmd of cmds) {
+    try {
+      const r = execSync(cmd, { encoding: 'utf8', timeout: 3000 }).trim();
+      if (r) return r;
+    } catch (_) {}
+  }
+
+  // Search in common dirs
+  try {
+    const r = execSync(
+      'find /usr /nix /run -name "chromium" -type f 2>/dev/null | head -1',
+      { encoding: 'utf8', timeout: 5000 }
+    ).trim();
+    if (r) return r;
+  } catch (_) {}
+
+  return null;
+}
+
+const chromiumPath = findChromiumPath();
+if (chromiumPath) {
+  process.env.CHROMIUM_PATH = chromiumPath;
+  console.log(`✅ Chromium found: ${chromiumPath}`);
+} else {
+  console.error('❌ Chromium NOT found! Scraping will fail.');
+  // Log all available executables to help debug
+  try {
+    const ls = execSync('ls /usr/bin/ | grep -i chrom', { encoding: 'utf8', timeout: 3000 });
+    console.log('📂 /usr/bin chrom*:', ls);
+  } catch (_) {}
+  try {
+    const ls2 = execSync('ls /nix/store/ 2>/dev/null | grep -i chrom | head -5', { encoding: 'utf8', timeout: 3000 });
+    console.log('📂 /nix/store chrom*:', ls2);
+  } catch (_) {}
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 const corsOptions = {
   origin: process.env.CORS_ORIGIN || '*',
   credentials: true,
@@ -19,26 +73,22 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
+  res.status(200).json({
+    status: 'OK',
     service: 'MXN Signals Backend',
     version: '1.0.0',
+    chromium: chromiumPath || 'NOT FOUND',
     timestamp: new Date().toISOString()
   });
 });
 
 app.get('/ping', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    message: 'pong',
-    timestamp: new Date().toISOString()
-  });
+  res.status(200).json({ status: 'OK', message: 'pong', timestamp: new Date().toISOString() });
 });
 
 app.get('/', (req, res) => {
-  res.status(200).json({ 
+  res.status(200).json({
     message: 'FER3OON MXN Signals API',
     version: '1.0.0',
     status: 'running',
@@ -51,27 +101,20 @@ app.get('/', (req, res) => {
   });
 });
 
-// API Routes
 app.use('/api/signals', signalsRoutes);
 
-// 404 handler
 app.use((req, res) => {
-  res.status(404).json({ 
-    error: 'Route not found',
-    path: req.path
-  });
+  res.status(404).json({ error: 'Route not found', path: req.path });
 });
 
-// Error handler
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Internal server error',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 
-// Start server
 app.listen(PORT, () => {
   console.log(`🚀 MXN Signals Backend running on port ${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV}`);
