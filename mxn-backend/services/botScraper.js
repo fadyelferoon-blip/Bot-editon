@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer-core');
+const puppeteer = require('puppeteer');
 
 const ALL_PAIRS = [
   'USD_MXN_OTC_QTX', 'USD_TRY_OTC_QTX', 'US_CRUDE_OTC_QTX',
@@ -6,51 +6,27 @@ const ALL_PAIRS = [
   'USD_INR_OTC_QTX', 'BITCOIN_OTC_QTX', 'LTC_USD_OTC_QTX', 'ETH_USD_OTC_QTX'
 ];
 
-// Chromium paths to try
-const CHROMIUM_PATHS = [
-  '/run/current-system/sw/bin/chromium',
-  '/usr/bin/chromium',
-  '/usr/bin/chromium-browser',
-  '/usr/bin/google-chrome',
-  process.env.CHROMIUM_PATH,
-].filter(Boolean);
-
 class BotScraper {
   constructor() {
     this.browser = null;
-    this.botUrl = process.env.BOT_URL || 'https://fer3oon-bot.railway.app';
-  }
-
-  async findChromium() {
-    const fs = require('fs');
-    for (const p of CHROMIUM_PATHS) {
-      if (fs.existsSync(p)) {
-        console.log(`✅ Found Chromium at: ${p}`);
-        return p;
-      }
-    }
-    // Try which command
-    try {
-      const { execSync } = require('child_process');
-      const path = execSync('which chromium || which chromium-browser || which google-chrome', { encoding: 'utf8' }).trim();
-      if (path) { console.log(`✅ Found Chromium via which: ${path}`); return path; }
-    } catch (_) {}
-    throw new Error('Chromium not found. Set CHROMIUM_PATH env variable.');
+    this.botUrl = process.env.BOT_URL || 'https://fer3oon-bot-server.railway.app';
   }
 
   async initBrowser() {
     if (this.browser) return;
     console.log('🚀 Launching browser...');
-    const executablePath = await this.findChromium();
     this.browser = await puppeteer.launch({
-      executablePath,
       headless: 'new',
       protocolTimeout: 180000,
       args: [
-        '--no-sandbox', '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage', '--disable-gpu',
-        '--no-first-run', '--no-zygote',
-        '--single-process', '--disable-extensions'
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-extensions'
       ]
     });
     console.log('✅ Browser launched');
@@ -71,7 +47,6 @@ class BotScraper {
       await page.select('#selDays', '20');            await page.waitForTimeout(500);
       await page.select('#selOrderType', orderType); await page.waitForTimeout(500);
 
-      console.log(`✅ Form filled: ${pair}, ${orderType}`);
       await page.evaluate(() => { getHistoric(); });
 
       await page.waitForFunction(
@@ -83,37 +58,27 @@ class BotScraper {
         return listBestPairTimes.map(s => {
           const t = s.time.split(':');
           return {
-            pair: pairName, hour: parseInt(t[0]),
-            minute: parseInt(t[1]), second: parseInt(t[2] || 0),
-            time: s.time, type, winrate: s.winrate || 100
+            pair: pairName,
+            hour: parseInt(t[0]),
+            minute: parseInt(t[1]),
+            second: parseInt(t[2] || 0),
+            time: s.time,
+            type,
+            winrate: s.winrate || 100
           };
         });
       }, orderType, pair);
 
-      console.log(`✅ Got ${signals.length} ${orderType} signals for ${pair}`);
+      console.log(`✅ Got ${signals.length} ${orderType} for ${pair}`);
       await page.close();
       await this.closeBrowser();
       return signals;
 
     } catch (error) {
-      console.error(`❌ Error scraping ${pair} ${orderType}:`, error.message);
+      console.error(`❌ Error ${pair} ${orderType}:`, error.message);
       await this.closeBrowser();
-      throw error;
+      return [];
     }
-  }
-
-  async scrapeAllPairs(orderType = 'PUT') {
-    const all = [];
-    for (const pair of ALL_PAIRS) {
-      try {
-        const signals = await this.scrapeSignals(orderType, pair);
-        all.push(...signals);
-        await this.sleep(1000);
-      } catch (e) {
-        console.error(`⚠️ Skipping ${pair} ${orderType}: ${e.message}`);
-      }
-    }
-    return all;
   }
 
   async closeBrowser() {
