@@ -1,17 +1,8 @@
 [phases.setup]
-nixPkgs = [
-  "nodejs_18"
-  "chromium"   # نثبت Chromium من البداية
-]
+nixPkgs = ["nodejs_18", "chromium"]
 
 [phases.install]
-cmds = [
-  # تثبيت الحزم بسرعة من package-lock
-  "npm ci --omit=dev",
-
-  # تحديد مسار Chromium المثبت مسبقًا لاستخدامه في puppeteer-core
-  "export CHROMIUM_PATH=$(which chromium || which chromium-browser || which google-chrome || true)"
-]
+cmds = ["npm ci --omit=dev"]
 
 [start]
 cmd = "node server.js"
