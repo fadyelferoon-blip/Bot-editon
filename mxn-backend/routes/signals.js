@@ -1,14 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const signalsController = require('../controllers/signalsController');
+const ctrl = require('../controllers/signalsController');
 
-// Get MXN signal with timezone support
-router.post('/mxn', signalsController.generateMXNSignals);
-
-// Get upcoming signals
-router.get('/upcoming', signalsController.getUpcomingSignals);
-
-// Clear cache
-router.post('/clear-cache', signalsController.clearCache);
+router.post('/mxn',         ctrl.generateMXNSignals);
+router.get('/upcoming',     ctrl.getUpcomingSignals);
+router.get('/status',       ctrl.getCacheStatus);
+router.post('/clear-cache', ctrl.clearCache);
+router.post('/refresh',     ctrl.forceRefresh);
 
 module.exports = router;
