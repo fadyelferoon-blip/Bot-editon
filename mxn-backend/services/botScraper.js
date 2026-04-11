@@ -1,11 +1,5 @@
 const puppeteer = require('puppeteer');
 
-const ALL_PAIRS = [
-  'USD_MXN_OTC_QTX', 'USD_TRY_OTC_QTX', 'US_CRUDE_OTC_QTX',
-  'UK_BRENT_OTC_QTX', 'GOLD_OTC_QTX', 'SILVER_OTC_QTX',
-  'USD_INR_OTC_QTX', 'BITCOIN_OTC_QTX', 'LTC_USD_OTC_QTX', 'ETH_USD_OTC_QTX'
-];
-
 class BotScraper {
   constructor() {
     this.browser = null;
@@ -19,14 +13,10 @@ class BotScraper {
       headless: 'new',
       protocolTimeout: 180000,
       args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-extensions'
+        '--no-sandbox', '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage', '--disable-gpu',
+        '--no-first-run', '--no-zygote',
+        '--single-process', '--disable-extensions'
       ]
     });
     console.log('✅ Browser launched');
@@ -58,13 +48,9 @@ class BotScraper {
         return listBestPairTimes.map(s => {
           const t = s.time.split(':');
           return {
-            pair: pairName,
-            hour: parseInt(t[0]),
-            minute: parseInt(t[1]),
-            second: parseInt(t[2] || 0),
-            time: s.time,
-            type,
-            winrate: s.winrate || 100
+            pair: pairName, hour: parseInt(t[0]),
+            minute: parseInt(t[1]), second: parseInt(t[2] || 0),
+            time: s.time, type, winrate: s.winrate || 100
           };
         });
       }, orderType, pair);
