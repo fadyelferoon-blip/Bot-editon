@@ -1,77 +1,92 @@
 const signalAnalyzer = require('../services/signalAnalyzer');
 const timezoneConverter = require('../services/timezoneConverter');
 
+// POST /api/signals/mxn
 exports.generateMXNSignals = async (req, res) => {
   try {
-    const { uid, deviceId, timezone } = req.body;
+    const { uid, timezone } = req.body;
     const userTimezone = timezone ? parseInt(timezone) : 2;
 
-    console.log(`🔥 Fetching MXN signals for ${uid} (UTC+${userTimezone})`);
+    console.log(`📡 Signal request: uid=${uid} tz=UTC+${userTimezone}`);
 
-    const putSignals  = await signalAnalyzer.generateMXNSignals('PUT');
-    const callSignals = await signalAnalyzer.generateMXNSignals('CALL');
-
-    const convertedPut  = timezoneConverter.findNextSignal(putSignals,  userTimezone);
-    const convertedCall = timezoneConverter.findNextSignal(callSignals, userTimezone);
-
-    const nextPut  = convertedPut[0];
-    const nextCall = convertedCall[0];
-
-    let nextSignal = null;
-    if (nextPut && nextCall) {
-      nextSignal = nextPut.secondsUntil < nextCall.secondsUntil ? nextPut : nextCall;
-    } else {
-      nextSignal = nextPut || nextCall;
+    // If cache not ready yet, return loading status
+    if (!signalAnalyzer.isCacheValid()) {
+      return res.json({
+        success: false,
+        loading: true,
+        message: signalAnalyzer.isRefreshing 
+          ? 'Signals are being loaded, please wait...'
+          : 'No signals available yet'
+      });
     }
 
-    if (!nextSignal) {
-      return res.json({ success: false, message: 'No signals available' });
+    const signal = signalAnalyzer.getNextSignal(userTimezone);
+
+    if (!signal) {
+      return res.json({ success: false, message: 'No upcoming signals found' });
     }
 
-    console.log(`🎯 NEXT: ${nextSignal.type} USD/MXN @ ${nextSignal.localTime} (${nextSignal.minutesUntil}min)`);
+    // Record this pair as served (for rotation)
+    signalAnalyzer.recordServed(signal.pairId);
+
+    console.log(`🎯 Serving: ${signal.type} ${signal.pairDisplay} in ${signal.minutesUntil}min`);
 
     res.json({
       success: true,
       nextSignal: {
-        pair: 'USD/MXN',
-        pairId: 'USD_MXN_OTC_QTX',
-        type: nextSignal.type,
-        time: nextSignal.localTime,
-        originalTime: nextSignal.time,
-        winrate: nextSignal.winrate,
-        secondsUntil: nextSignal.secondsUntil,
-        minutesUntil: nextSignal.minutesUntil,
-        countdown: timezoneConverter.formatCountdown(nextSignal.secondsUntil)
+        pair:         signal.pairDisplay,
+        pairId:       signal.pairId,
+        type:         signal.type,
+        time:         signal.localTime,
+        originalTime: signal.time,
+        winrate:      signal.winrate,
+        secondsUntil: signal.secondsUntil,
+        minutesUntil: signal.minutesUntil,
+        countdown:    timezoneConverter.formatCountdown(signal.secondsUntil)
       },
       userTimezone,
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ success: false, message: 'Failed to generate signals', error: error.message });
+    console.error('❌ Signal error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
+// GET /api/signals/upcoming
 exports.getUpcomingSignals = async (req, res) => {
   try {
     const userTimezone = req.query.timezone ? parseInt(req.query.timezone) : 2;
-    const put  = await signalAnalyzer.generateMXNSignals('PUT');
-    const call = await signalAnalyzer.generateMXNSignals('CALL');
-    const all  = [...timezoneConverter.findNextSignal(put, userTimezone),
-                  ...timezoneConverter.findNextSignal(call, userTimezone)]
-                 .sort((a, b) => a.secondsUntil - b.secondsUntil);
-    res.json({ success: true, signals: all.slice(0, 20), userTimezone, timestamp: new Date().toISOString() });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed', error: error.message });
+
+    if (!signalAnalyzer.isCacheValid()) {
+      return res.json({ success: false, loading: true, message: 'Loading...' });
+    }
+
+    const converted = require('../services/timezoneConverter')
+      .findNextSignal(signalAnalyzer.allSignals, userTimezone)
+      .sort((a, b) => a.secondsUntil - b.secondsUntil)
+      .slice(0, 20);
+
+    res.json({ success: true, signals: converted, userTimezone });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
   }
 };
 
+// GET /api/signals/status
+exports.getCacheStatus = async (req, res) => {
+  res.json({ success: true, ...signalAnalyzer.getCacheStatus() });
+};
+
+// POST /api/signals/clear-cache
 exports.clearCache = async (req, res) => {
-  try {
-    signalAnalyzer.clearCache();
-    res.json({ success: true, message: 'Cache cleared' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+  signalAnalyzer.clearCache();
+  res.json({ success: true, message: 'Cache cleared. Refresh will happen in background.' });
+};
+
+// POST /api/signals/refresh
+exports.forceRefresh = async (req, res) => {
+  res.json({ success: true, message: 'Refresh started in background' });
+  signalAnalyzer.refreshAllSignals(); // don't await - runs in background
 };
