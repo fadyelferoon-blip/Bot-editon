@@ -21,3 +21,7 @@
   "author": "FER3OON",
   "license": "ISC"
 }
+"scripts": {
+  "start": "node server.js",
+  "postinstall": "npx puppeteer browsers install chromium"
+}
