@@ -8,15 +8,10 @@ const PORT = process.env.PORT || 5001;
 
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'] }));
 app.use(express.json());
-
-// Routes
-const signalsRoutes = require('./routes/signals');
-app.use('/api/signals', signalsRoutes);
+app.use('/api/signals', require('./routes/signals'));
 
 app.get('/', (req, res) => res.json({
-  message: 'FER3OON Signals API',
-  version: '2.0.0',
-  status: 'running',
+  message: 'FER3OON Signals API', version: '2.0.0',
   cache: signalAnalyzer.getCacheStatus()
 }));
 
@@ -26,13 +21,10 @@ app.get('/health', (req, res) => res.json({
   timestamp: new Date().toISOString()
 }));
 
-app.use((req, res) => res.status(404).json({ error: 'Not found' }));
+app.use((req, res) => res.status(404).json({ error: 'Not found', path: req.path }));
 
-// Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🤖 Bot URL: ${process.env.BOT_URL}`);
-  
-  // Start background signal refresh
+  console.log(`🚀 Server on port ${PORT}`);
+  console.log(`🤖 Bot: ${process.env.BOT_URL}`);
   signalAnalyzer.startBackgroundRefresh();
 });
