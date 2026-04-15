@@ -1,5 +1,10 @@
 const puppeteer = require('puppeteer');
 
+const PAIRS = {
+  'USD_MXN_OTC_QTX': 'USD/MXN',
+  'GOLD_OTC_QTX':    'GOLD'
+};
+
 class BotScraper {
   constructor() {
     this.browser = null;
@@ -8,6 +13,7 @@ class BotScraper {
 
   async initBrowser() {
     if (this.browser) return;
+    console.log('🚀 Launching browser...');
     this.browser = await puppeteer.launch({
       headless: 'new',
       protocolTimeout: 180000,
@@ -18,9 +24,10 @@ class BotScraper {
         '--single-process', '--disable-extensions'
       ]
     });
+    console.log('✅ Browser launched');
   }
 
-  async scrapeOnePair(orderType, pair) {
+  async scrapeOnePair(orderType, pairId) {
     let page = null;
     try {
       await this.initBrowser();
@@ -28,18 +35,12 @@ class BotScraper {
       await page.setViewport({ width: 1280, height: 800 });
       await page.goto(this.botUrl, { waitUntil: 'networkidle2', timeout: 60000 });
 
-      await page.select('#cbAtivo', pair);
-      await page.waitForTimeout(300);
-      await page.select('#selPercentageMin', '100');
-      await page.waitForTimeout(300);
-      await page.select('#selPercentageMax', '100');
-      await page.waitForTimeout(300);
-      await page.select('#selCandleTime', 'M1');
-      await page.waitForTimeout(300);
-      await page.select('#selDays', '20');
-      await page.waitForTimeout(300);
-      await page.select('#selOrderType', orderType);
-      await page.waitForTimeout(300);
+      await page.select('#cbAtivo', pairId);          await page.waitForTimeout(400);
+      await page.select('#selPercentageMin', '100');   await page.waitForTimeout(400);
+      await page.select('#selPercentageMax', '100');   await page.waitForTimeout(400);
+      await page.select('#selCandleTime', 'M1');       await page.waitForTimeout(400);
+      await page.select('#selDays', '20');              await page.waitForTimeout(400);
+      await page.select('#selOrderType', orderType);   await page.waitForTimeout(400);
 
       await page.evaluate(() => { getHistoric(); });
 
@@ -48,11 +49,11 @@ class BotScraper {
         { timeout: 90000 }
       );
 
-      const signals = await page.evaluate((type, pairName) => {
+      const signals = await page.evaluate((type, pid) => {
         return listBestPairTimes.map(s => {
           const t = s.time.split(':');
           return {
-            pair: pairName,
+            pairId: pid,
             hour: parseInt(t[0]),
             minute: parseInt(t[1]),
             second: parseInt(t[2] || 0),
@@ -61,16 +62,16 @@ class BotScraper {
             winrate: s.winrate || 100
           };
         });
-      }, orderType, pair);
+      }, orderType, pairId);
 
-      console.log(`  ✅ ${pair} ${orderType}: ${signals.length} signals`);
+      console.log(`  ✅ ${pairId} ${orderType}: ${signals.length} signals`);
+      await page.close();
       return signals;
 
     } catch (e) {
-      console.error(`  ❌ ${pair} ${orderType}: ${e.message}`);
-      return [];
-    } finally {
+      console.error(`  ❌ ${pairId} ${orderType}: ${e.message}`);
       if (page) await page.close().catch(() => {});
+      return [];
     }
   }
 
@@ -78,8 +79,9 @@ class BotScraper {
     if (this.browser) {
       await this.browser.close().catch(() => {});
       this.browser = null;
+      console.log('🔒 Browser closed');
     }
   }
 }
 
-module.exports = new BotScraper();
+module.exports = { scraper: new BotScraper(), PAIRS };
